@@ -14,9 +14,9 @@ import matplotlib.pyplot as plt
 
 # %%
 # create data frames for each dataset 
-df_stats = pd.read_csv('nba_2025.txt')
+df_stats = pd.read_csv('nba_2025.txt', sep=',', encoding='latin-1')
 # skip the first row of the salary dataset as it isn't useful
-df_salary = pd.read_csv('2025_salaries.csv', skiprows=1)
+df_salary = pd.read_csv('2025_salaries.csv', header=1, encoding='latin-1')
 
 # %%
 # look at the info for each of the data frames 
@@ -37,6 +37,15 @@ df = pd.merge(df_stats, df_salary, on='Player', how='inner')
 df.head()
 
 # %% 
+# convert salary into a numeric variable 
+
+# %% 
+# deal with duplicated data 
+duplicates = df[df.duplicated(subset='Player', keep=False)]
+
+# keep only the duplicate rows that have the most number of games 
+
+# %% 
 # check the info to see if there are columns with a lot of null values and to see 
 # which might be unnecessary to keep 
 df.info()
@@ -51,20 +60,16 @@ df.info()
 # position also probably won't be useful for us as we just want to find 
 # high-performing players who are underpaid regardless of position
 
-# we also don't need the FG%, 3P%, 2P%, and FT% columns as the attempted 
-# column combined with the made columns shows their 
+# we also don't need the FG%, eFG%, 3P%, 2P%, and FT% columns as the attempted 
+# column combined with the made columns shows the percentage of shows they made
 
-# eFG% is more useful than FG% because it weights three-point and two-point 
-# shots differently so we can drop FG% 
-
-# Since TRB just adds ORB and DRB, we can drop it 
 
 # FG also just adds 2P and 3P so that can be dropped 
 
 # GS also isn't important because we can see the total number of games and 
 # minutes 
 
-drop = ['Team', 'Pos', 'GS', 'FG', 'FGA', 'FG%', '3PA', '2PA', 'FTA', 'TRB', 'Awards', 'Player-additional', 'Tm']
+drop = ['Team', 'Pos', 'GS', 'FG', 'FGA', 'FG%', '3P%', '2P%', 'eFG%', 'FT%', 'Awards', 'Player-additional', 'Tm']
 df_clean = df.drop(columns=drop)
 
 # %%
@@ -85,3 +90,7 @@ df_clean2 = df_clean.drop(columns=['Player', 'Salary'])
 kmeans = KMeans(n_clusters=5, random_state=42, verbose=1)
 kmeans.fit(df_clean2)
 # %%
+# add the cluster labels to the data frame
+df_clean['cluster'] = kmeans.labels_
+# %%
+plt.scatter(df_clean['PTS'], df_clean['TRB'], 
