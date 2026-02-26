@@ -36,16 +36,6 @@ df = pd.merge(df_stats, df_salary, on='Player', how='inner')
 # properly 
 df.head()
 
-# %% 
-# convert salary into a numeric variable
-# this replaces any character that isn't a digit with an empty string and replaces 
-# those digits as a float 
-df["Salary"] = (
-    df["Salary"]
-        .replace(r"[^\d]", "", regex=True)
-        .astype(float)
-)
-
 
 # %% 
 # deal with duplicated data 
@@ -85,18 +75,22 @@ df.info()
 # position also probably won't be useful for us as we just want to find 
 # high-performing players who are underpaid regardless of position
 
-# we also don't need the FG%, eFG%, 3P%, 2P%, and FT% columns as the attempted 
-# column combined with the made columns shows the percentage of shows they made
+# we also don't need the FGA, 3PA, 2PA, and FTA columns as the percentage made 
+# encapsulates how effective of a shooter they are better than these columns do.  
 
-
-# FG also just adds 2P and 3P so that can be dropped 
+# FG also just adds 2P and 3P so that can be dropped and FG% can be dropped because
+# eFG% is more telling (it weights 3 point shots as 1.5 times more important than 
+# 2 point ones).
 
 # GS also isn't important because we can see the total number of games and 
 # minutes 
 
-# drop = ['Team', 'Pos', 'GS', 'FG', 'FGA', 'FG%', '3P%', '2P%', 'eFG%', 'FT%', 'Awards', 'Player-additional', 'Tm']
-drop = ['Team', 'Pos', 'Awards', 'Player-additional', 'Tm']
+# rank and age also aren't helpful to us because they're not directly stats from games
+
+
+drop = ['Rk', 'Age', 'Team', 'Pos', 'GS', 'FG', 'FGA', 'FG%', '3PA', '2PA', 'FTA', 'Awards', 'Player-additional', 'Tm']
 df_clean = df.drop(columns=drop)
+
 
 
 # %%
@@ -107,11 +101,6 @@ df_clean = df_clean.dropna(subset=['Salary'])
 # %% 
 df_clean.info()
 
-# %% 
-# make a new column that shows how many points per game each player scored 
-df_clean['PPG'] = df_clean.apply(lambda row: row['PTS']/row['G'], axis=1)
-# also make a new column that shows the total rebounds per game 
-df_clean['TRBG'] = df_clean.apply(lambda row: row['TRB']/row['G'], axis=1)
 # %%
 # when we fit the model, we don't want player or salary to be included as salary is 
 # our target variable and player is a unique identifier 
@@ -126,6 +115,12 @@ kmeans.fit(df_clean2)
 # %%
 # add the cluster labels to the data frame
 df_clean['cluster'] = kmeans.labels_
+
+# %% 
+# make a new column that shows how many points per game each player scored 
+df_clean['PPG'] = df_clean.apply(lambda row: row['PTS']/row['G'], axis=1)
+# also make a new column that shows the total rebounds per game 
+df_clean['TRBG'] = df_clean.apply(lambda row: row['TRB']/row['G'], axis=1)
 
 # %%
 # create a visualization of the clusters 
@@ -202,10 +197,10 @@ plt.show()
 # %% [markdown]
 # ## Finding the optimal number of clusters based on silhouette score and elbow plot 
 # 
-# The silhouette scores clearly show that the optimal number of cluster 
-# is 2. The elbow plot seems to flatten out around 3 or 4, so we'll try 
-# reclustering with three clusters since it's the middle of the results from the 
-# elbow plot and silhouette scores. 
+# The silhouette scores show that the optimal number of clusters is 2. 
+# The elbow plot seems to flatten out around 3 or 4, so we'll try 
+# reclustering with three clusters, since that's inbetween the results 
+# of the silhouette scores and the elbow plot. 
 
 # %% 
 # initalize KMeans with 3 clusters 
@@ -249,9 +244,63 @@ from sklearn.metrics import silhouette_score
 silhouette = silhouette_score(df_clean2, kmeans2.labels_)
 print(f'Silhouette score: {silhouette}')
 
+# %% 
+# change salary to a numeric variable so it can be plotted continuously as the color 
+# using .replace turns all the dollar signs and commas into the empty string so each value is 
+# only numbers, then it can be turned into a float
+df_clean["Salary"] = (
+    df_clean["Salary"]
+        .replace(r"[\$,]", "", regex=True)  
+        .astype(float)                     
+)
+
 # %%
 import seaborn as sns 
 sns.scatterplot(data=df_clean, x='PTS', y='TRB', hue='Salary', style='optimal-clusters', palette='viridis')
 plt.legend(loc='upper right', bbox_to_anchor=(1.35,1))
 plt.show()
+
 # %%
+# import plotly to make an interactive graph 
+import plotly.express as px 
+
+# %% 
+fig = px.scatter(
+    df_clean,
+    x='PTS', 
+    y='TRB', 
+    width=900, 
+    height=500,
+    color='Salary', 
+    symbol='optimal-clusters', 
+    title='Total points scored vs. total rebounds in the 2025 season by cluster', 
+    labels={
+        'PTS':'Total points scored', 
+        'TRB':'Total rebounds'
+        },
+    hover_data=[
+        'Player',
+        'Salary'
+    ] 
+)
+fig.update_layout(
+    legend=dict(
+        orientation="h",
+        y=-0.25,
+        x=0.5,
+        xanchor="center"
+    )
+)
+
+fig.show()
+# %% [markdown]
+# ## Players that Mr. Rooney Should and Shouldn't Target
+# 
+# He should not target Bradley Beal, Jalen Green, or Trae Young. 
+# 
+# He should target Kel'el Ware, Sandro Mamukelashvili, Sanit 
+# Aldama, and Brice Sensabaugh. 
+# 
+# The next best group of players for him to target are 
+# Jock Landale, Kyle Filipowski, P.J. Washington, and Ajay 
+# Mitchell. 
